@@ -6,7 +6,7 @@ This repository contains the data workspace for a CISC 351 project based on a pr
 - `2020-03` through `2020-12`: pandemic disruption period
 - `2023`: post-pandemic recovery period
 
-The project is built around New York City Taxi and Limousine Commission yellow taxi trip records and the taxi zone lookup table.
+The project is built around New York City Taxi and Limousine Commission yellow taxi trip records and the taxi zone lookup table. Original data table can be found here: https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page
 
 ## Repository Contents (after downloaded data)
 
@@ -71,7 +71,3 @@ The proposal framing for this project is a comparative analysis of taxi activity
 - how trip volume changed across the selected periods
 - which pickup and dropoff zones changed the most
 - whether travel patterns recovered evenly across the city
-
-## Data Source
-
-Use the official NYC TLC trip record data source for the yellow taxi parquet files and the corresponding taxi zone lookup table.

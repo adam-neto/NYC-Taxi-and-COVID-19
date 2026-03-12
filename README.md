@@ -8,37 +8,37 @@ This repository contains the data workspace for a CISC 351 project based on a pr
 
 The project is built around New York City Taxi and Limousine Commission yellow taxi trip records and the taxi zone lookup table. Original data table can be found here: https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page
 
-## Repository Contents (after downloaded data)
+## Repository Contents
 
-- `taxi_data/`: yellow taxi trip parquet files and `taxi_zone_lookup.csv`
+- `query_taxi_duckdb.py`: reusable DuckDB query helper for local TLC parquet files
+- `taxi_data/`: local parquet files and lookup tables used by the DuckDB workflow
 
-The current dataset footprint is large, about `2.0G`.
+## Query Workflow
 
-## Data Files Required
+The project uses DuckDB queries against local TLC parquet files instead of building one large local pandas DataFrame.
 
-This project depends on the following manually downloaded files inside `taxi_data/`:
+The main entry point is [`query_taxi_duckdb.py`](query_taxi_duckdb.py), which:
 
-- `taxi_zone_lookup.csv`
+- queries the selected local TLC parquet files with DuckDB
+- returns monthly and period-level summaries
+- can be imported from other Python files for analysis code
+
+## Setup
+
+Install `duckdb` and `pandas` for Python:
+
+```bash
+pip install duckdb pandas
+```
+
+This workflow expects the required parquet files to be present in `taxi_data/`.
+
+Required files:
+
 - `yellow_tripdata_2019-01.parquet` through `yellow_tripdata_2019-12.parquet`
 - `yellow_tripdata_2020-03.parquet` through `yellow_tripdata_2020-12.parquet`
 - `yellow_tripdata_2023-01.parquet` through `yellow_tripdata_2023-12.parquet`
-
-## Important Setup Note
-
-The `taxi_data` files must be downloaded manually. They should not be assumed to come from a fresh clone of this repository.
-
-If you are setting this project up on another machine:
-
-1. Create a `taxi_data/` directory at the repository root.
-2. Download the required NYC yellow taxi trip parquet files for the months listed above.
-3. Download `taxi_zone_lookup.csv`.
-4. Place all of those files directly inside `taxi_data/`.
-
-Because these files are large, `taxi_data/` is ignored by Git in [`.gitignore`](.gitignore).
-
-## Download Instructions
-
-From the repository root, run the following bash commands to download all required files into `taxi_data/`:
+- `taxi_zone_lookup.csv`
 
 ```bash
 # Create data directory
@@ -62,6 +62,21 @@ done
 
 # Download taxi zone lookup table
 curl -O https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv
+```
+
+Run the summary script from the repository root:
+
+```bash
+python3 query_taxi_duckdb.py
+```
+
+In Python analysis files, import it directly:
+
+```python
+import query_taxi_duckdb as q
+
+monthly_df, skipped = q.build_monthly_summary(data_dir="taxi_data")
+period_df, skipped = q.build_period_summary(data_dir="taxi_data")
 ```
 
 ## Project Goal

@@ -10,22 +10,17 @@ import pandas as pd
 
 DEFAULT_DB_PATH = ":memory:"
 DEFAULT_DATA_DIR = "taxi_data"
+PIPELINE_YEARS = [2019, 2020, 2021, 2022, 2023]
 
 
 def build_local_sources(data_dir: str | Path = DEFAULT_DATA_DIR) -> list[str]:
     data_dir = Path(data_dir)
-    sources: list[str] = []
+    sources: list[Path] = []
 
-    for month in range(1, 13):
-        sources.append(str(data_dir / f"yellow_tripdata_2019-{month:02d}.parquet"))
+    for year in PIPELINE_YEARS:
+        sources.extend(data_dir.glob(f"yellow_tripdata_{year}-*.parquet"))
 
-    for month in range(3, 13):
-        sources.append(str(data_dir / f"yellow_tripdata_2020-{month:02d}.parquet"))
-
-    for month in range(1, 13):
-        sources.append(str(data_dir / f"yellow_tripdata_2023-{month:02d}.parquet"))
-
-    return sources
+    return [str(path) for path in sorted(sources, key=lambda p: extract_year_month(str(p)))]
 
 
 def resolve_sources(data_dir: str | Path = DEFAULT_DATA_DIR) -> list[str]:
@@ -48,6 +43,8 @@ def infer_period_from_source(source: str) -> str:
         return "pre_covid"
     if "yellow_tripdata_2020-" in source:
         return "covid"
+    if "yellow_tripdata_2021-" in source or "yellow_tripdata_2022-" in source:
+        return "intermediate"
     if "yellow_tripdata_2023-" in source:
         return "post_covid"
     return "other"

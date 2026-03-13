@@ -1,9 +1,10 @@
 # Taxi Project
 
-This repository contains the data workspace for a CISC 351 project based on a proposal to study NYC yellow taxi trip patterns across three periods:
+This repository contains the data workspace for a CISC 351 project based on a proposal to study NYC yellow taxi trip patterns across multiple phases:
 
 - `2019`: pre-pandemic baseline
 - `2020-03` through `2020-12`: pandemic disruption period
+- `2021` and `2022`: intermediate recovery period
 - `2023`: post-pandemic recovery period
 
 The project is built around New York City Taxi and Limousine Commission yellow taxi trip records and the taxi zone lookup table. Original data table can be found here: https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page
@@ -37,6 +38,8 @@ Required files:
 
 - `yellow_tripdata_2019-01.parquet` through `yellow_tripdata_2019-12.parquet`
 - `yellow_tripdata_2020-03.parquet` through `yellow_tripdata_2020-12.parquet`
+- `yellow_tripdata_2021-*.parquet`
+- `yellow_tripdata_2022-*.parquet`
 - `yellow_tripdata_2023-01.parquet` through `yellow_tripdata_2023-12.parquet`
 - `taxi_zone_lookup.csv`
 
@@ -47,21 +50,29 @@ cd taxi_data
 
 # Download 2019 data (Pre-COVID baseline)
 for m in {01..12}; do
-  curl -O https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2019-$m.parquet
+  curl -f -O https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2019-$m.parquet
 done
 
 # Download 2020 data (COVID disruption period)
-for m in {03..12}; do
-  curl -O https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2020-$m.parquet
+for m in {01..12}; do
+  curl -f -O https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2020-$m.parquet
+done
+
+# Download 2021 and 2022 data (Intermediate recovery period)
+for m in {01..12}; do
+  curl -f -O https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2021-$m.parquet
+done
+for m in {01..12}; do
+  curl -f -O https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2022-$m.parquet
 done
 
 # Download 2023 data (Post-COVID recovery)
 for m in {01..12}; do
-  curl -O https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2023-$m.parquet
+  curl -f -O https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2023-$m.parquet
 done
 
 # Download taxi zone lookup table
-curl -O https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv
+curl -f -O https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv
 ```
 
 Run the summary script from the repository root:
@@ -78,6 +89,8 @@ import query_taxi_duckdb as q
 monthly_df, skipped = q.build_monthly_summary(data_dir="taxi_data")
 period_df, skipped = q.build_period_summary(data_dir="taxi_data")
 ```
+
+The shared pipeline labels `2021` and `2022` as `intermediate`. RQ2 is expected to use that intermediate period for recovery analysis; RQ1 and RQ3 can still subset the data if those years are not needed.
 
 ## Project Goal
 

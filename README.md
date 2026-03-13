@@ -17,6 +17,7 @@ The repository currently contains:
 - a shared DuckDB-based query pipeline for summarizing TLC parquet files
 - RQ2 analysis code for airport-related yellow taxi recovery at JFK and LaGuardia
 - a midterm report workspace, including a nested Overleaf Git repository
+- RQ3 analysis code for changes in cash versus cashless payment behavior over time
 
 The current RQ2 implementation compares JFK and LaGuardia across the four project periods using:
 
@@ -25,12 +26,22 @@ The current RQ2 implementation compares JFK and LaGuardia across the four projec
 - the internal mix between JFK and LaGuardia
 - period-level fare and trip distance summaries
 
+The current RQ3 implementation analyzes payment behavior across the four project periods using:
+
+- monthly cashless payment share
+- period-level payment mix summaries
+- percentage-point changes relative to the pre-COVID baseline
+- optional borough-level exploratory summaries using pickup borough
+
 ## Repository Contents
 
 - `query_taxi_duckdb.py`: reusable DuckDB query helper for local TLC parquet files
 - `RQ2/`
   - `airport_trip_analysis.py`: builds RQ2 airport recovery summaries
   - `airport_trip_figures.py`: generates RQ2 figures from the airport summaries
+- `RQ3/`
+  - `cashless_payment_analysis.py`: builds RQ3 payment-behavior summaries
+  - `cashless_payment_figures.py`: generates RQ3 figures from the payment summaries
 - `proposal/`: project proposal PDF, requirements PDF, and TA feedback
 - `midterm_report/`: midterm report materials and report repository
 
@@ -46,7 +57,7 @@ The main entry point is [`query_taxi_duckdb.py`](query_taxi_duckdb.py), which:
 
 ## Setup
 
-Install `duckdb` and `pandas` for Python:
+Install the required Python packages:
 
 ```bash
 pip install duckdb pandas
@@ -57,7 +68,7 @@ This workflow expects the required parquet files to be present in `taxi_data/`.
 Required files:
 
 - `yellow_tripdata_2019-01.parquet` through `yellow_tripdata_2019-12.parquet`
-- `yellow_tripdata_2020-03.parquet` through `yellow_tripdata_2020-12.parquet`
+- `yellow_tripdata_2020-01.parquet` through `yellow_tripdata_2020-12.parquet`
 - `yellow_tripdata_2021-*.parquet`
 - `yellow_tripdata_2022-*.parquet`
 - `yellow_tripdata_2023-01.parquet` through `yellow_tripdata_2023-12.parquet`
@@ -110,7 +121,7 @@ monthly_df, skipped = q.build_monthly_summary(data_dir="taxi_data")
 period_df, skipped = q.build_period_summary(data_dir="taxi_data")
 ```
 
-The shared pipeline labels `2021` and `2022` as `intermediate`. RQ2 is expected to use that intermediate period for recovery analysis; RQ1 and RQ3 can still subset the data if those years are not needed.
+The shared pipeline labels `2021` and `2022` as `intermediate`. RQ2 and RQ3 use that intermediate period for recovery analysis, while any analysis can still subset the data further if needed.
 
 ## RQ2 Workflow
 
@@ -130,13 +141,31 @@ python3 RQ2/airport_trip_figures.py
 
 This writes PNG figures to `RQ2/figures/`.
 
+## RQ3 Workflow
+
+Run the RQ3 airport analysis from the repository root:
+
+```bash
+python3 RQ3/cashless_payment_analysis.py
+```
+
+This writes CSV outputs to `RQ3/outputs/`.
+
+To generate the figures used in the report:
+
+```bash
+python3 RQ3/cashless_payment_figures.py
+```
+
+This writes PNG figures to `RQ3/figures/`.
+
 ## Project Goal
 
-The proposal framing for this project is a comparative analysis of taxi activity before, during, and after the COVID-era disruption. A typical analysis workflow would focus on questions such as:
+The project is a comparative analysis of NYC yellow taxi behavior before, during, and after the COVID-era disruption. The three research questions focus on:
 
-- how trip volume changed across the selected periods
-- which pickup and dropoff zones changed the most
-- whether travel patterns recovered evenly across the city
+- changes in tipping behavior
+- airport-related trip recovery
+- changes in cash versus cashless payment behavior
 
 ## Midterm Report and Overleaf Repo
 

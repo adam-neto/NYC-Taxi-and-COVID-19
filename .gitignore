@@ -3,3 +3,5 @@ __pycache__/
 
 taxi_data/
 *.duckdb
+figures/
+outputs/

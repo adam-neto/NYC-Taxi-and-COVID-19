@@ -1,0 +1,21 @@
+PROJECT EVALUATION
+
+This project will be evaluated on the following criteria:
+
+Soundness
+- Does the technical material make sense?
+- Are the things tried reasonable?
+
+Workload & Novelty
+- Are the proposed algorithms or applications clever and interesting?
+- Does the project convey novel insight about the problem and/or algorithms?
+- Does the project have sufficient scope?
+
+Verifiability
+- Can the provided code executable?
+- Can we follow the readme to reproduce all experiment results?
+- Are the methodology and experiments clearly stated?
+
+Presentation
+- Are the background and motivation of the problem clearly stated?
+- Are the summarized findings aligned with experiment results?

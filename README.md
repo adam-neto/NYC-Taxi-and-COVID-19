@@ -167,6 +167,7 @@ This writes CSV outputs to `RQ2/outputs/`, including:
 - descriptive monthly and period summaries:
   - `airport_monthly_summary.csv`
   - `airport_monthly_share.csv`
+  - `airport_period_share_summary.csv`
   - `airport_monthly_mix.csv`
   - `airport_period_summary.csv`
   - `airport_recovery_summary.csv`
@@ -188,6 +189,8 @@ The RQ2 regression module compares JFK and LaGuardia recovery paths using:
 - JFK-by-period interaction terms
 - month-of-year fixed effects
 - a pickup-only airport-definition robustness check in addition to the pickup-or-dropoff definition
+
+For descriptive reporting, the repository saves both monthly-share and period-share summaries. The report currently uses average monthly shares for the main descriptive comparisons because the intermediate period spans two years, while `airport_period_share_summary.csv` provides a period-total aggregation that can be used as a robustness check on that descriptive choice.
 
 ### 2. Generate the RQ2 figures from the saved analysis outputs
 

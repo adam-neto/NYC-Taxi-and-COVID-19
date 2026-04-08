@@ -26,6 +26,7 @@ PERIOD_ORDER = ["pre_covid", "covid", "intermediate", "post_covid"]
 MAIN_OUTPUT_FILES = {
     "airport_monthly": "airport_monthly_summary.csv",
     "airport_share": "airport_monthly_share.csv",
+    "airport_period_share": "airport_period_share_summary.csv",
     "airport_period": "airport_period_summary.csv",
     "airport_mix": "airport_monthly_mix.csv",
     "recovery_summary": "airport_recovery_summary.csv",
@@ -157,6 +158,23 @@ def build_airport_period_summary(airport_monthly: pd.DataFrame) -> pd.DataFrame:
     return summary
 
 
+def build_airport_period_share_summary(airport_share: pd.DataFrame) -> pd.DataFrame:
+    summary = (
+        airport_share.groupby(["period", "airport"], as_index=False)
+        .agg(
+            airport_trip_count=("airport_trip_count", "sum"),
+            all_trip_count=("all_trip_count", "sum"),
+        )
+    )
+    summary["airport_trip_share"] = (
+        summary["airport_trip_count"] / summary["all_trip_count"]
+    )
+    summary["period"] = pd.Categorical(
+        summary["period"], categories=PERIOD_ORDER, ordered=True
+    )
+    return summary.sort_values(["airport", "period"]).reset_index(drop=True)
+
+
 def build_airport_mix_summary(airport_monthly: pd.DataFrame) -> pd.DataFrame:
     mix = airport_monthly.copy()
     total_by_month = mix.groupby(["year", "month"], as_index=False).agg(
@@ -205,6 +223,9 @@ def build_airport_output_bundle(
     }
     if include_extended_outputs:
         airport_period = build_airport_period_summary(airport_monthly)
+        output_bundle["airport_period_share"] = build_airport_period_share_summary(
+            airport_share
+        )
         output_bundle["airport_period"] = airport_period
         output_bundle["airport_mix"] = build_airport_mix_summary(airport_monthly)
         output_bundle["recovery_summary"] = build_recovery_summary(airport_period)

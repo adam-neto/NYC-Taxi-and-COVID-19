@@ -13,27 +13,70 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 import query_taxi_duckdb as q
+from airport_recovery_regression import (
+    build_airport_panel_summary,
+    build_airport_regression_outputs,
+)
 
 JFK_LOCATION_ID = 132
 LGA_LOCATION_ID = 138
 RQ2_DIR = Path(__file__).resolve().parent
 DEFAULT_OUTPUT_DIR = RQ2_DIR / "outputs"
 PERIOD_ORDER = ["pre_covid", "covid", "intermediate", "post_covid"]
+MAIN_OUTPUT_FILES = {
+    "airport_monthly": "airport_monthly_summary.csv",
+    "airport_share": "airport_monthly_share.csv",
+    "airport_period": "airport_period_summary.csv",
+    "airport_mix": "airport_monthly_mix.csv",
+    "recovery_summary": "airport_recovery_summary.csv",
+    "airport_panel": "airport_monthly_panel.csv",
+    "regression_coefficients": "airport_regression_coefficients.csv",
+    "regression_diagnostics": "airport_regression_diagnostics.csv",
+}
+ROBUSTNESS_OUTPUT_FILES = {
+    "airport_monthly": "airport_pickup_only_monthly_summary.csv",
+    "airport_share": "airport_pickup_only_monthly_share.csv",
+    "airport_panel": "airport_pickup_only_monthly_panel.csv",
+    "regression_coefficients": "airport_pickup_only_regression_coefficients.csv",
+    "regression_diagnostics": "airport_pickup_only_regression_diagnostics.csv",
+}
 
 
 def build_airport_monthly_summary(
     data_dir: str | Path = q.DEFAULT_DATA_DIR,
     db_path: str = q.DEFAULT_DB_PATH,
     skip_errors: bool = True,
+    airport_definition: str = "pickup_or_dropoff",
 ) -> tuple[pd.DataFrame, list[str]]:
-    select_sql = f"""
-        SELECT
+    if airport_definition == "pickup_or_dropoff":
+        airport_case = f"""
             CASE
                 WHEN PULocationID = {JFK_LOCATION_ID} OR DOLocationID = {JFK_LOCATION_ID}
                     THEN 'JFK'
                 WHEN PULocationID = {LGA_LOCATION_ID} OR DOLocationID = {LGA_LOCATION_ID}
                     THEN 'LaGuardia'
-            END AS airport,
+            END
+        """
+        where_clause = f"""
+            PULocationID IN ({JFK_LOCATION_ID}, {LGA_LOCATION_ID})
+            OR DOLocationID IN ({JFK_LOCATION_ID}, {LGA_LOCATION_ID})
+        """
+    elif airport_definition == "pickup_only":
+        airport_case = f"""
+            CASE
+                WHEN PULocationID = {JFK_LOCATION_ID} THEN 'JFK'
+                WHEN PULocationID = {LGA_LOCATION_ID} THEN 'LaGuardia'
+            END
+        """
+        where_clause = f"PULocationID IN ({JFK_LOCATION_ID}, {LGA_LOCATION_ID})"
+    else:
+        raise ValueError(
+            "airport_definition must be 'pickup_or_dropoff' or 'pickup_only'"
+        )
+
+    select_sql = f"""
+        SELECT
+            {airport_case} AS airport,
             COUNT(*) AS airport_trip_count,
             SUM(fare_amount) AS fare_amount_sum,
             SUM(tip_amount) AS tip_amount_sum,
@@ -45,8 +88,7 @@ def build_airport_monthly_summary(
             AVG(trip_distance) AS avg_trip_distance
         FROM read_parquet('__SOURCE__', union_by_name = true)
         WHERE
-            PULocationID IN ({JFK_LOCATION_ID}, {LGA_LOCATION_ID})
-            OR DOLocationID IN ({JFK_LOCATION_ID}, {LGA_LOCATION_ID})
+            {where_clause}
         GROUP BY airport
     """
     df, skipped_sources = q.run_query(
@@ -144,22 +186,115 @@ def build_recovery_summary(airport_period: pd.DataFrame) -> pd.DataFrame:
     return recovery.sort_values(["airport", "period"]).reset_index(drop=True)
 
 
-def save_outputs(
+def build_airport_output_bundle(
     airport_monthly: pd.DataFrame,
-    airport_share: pd.DataFrame,
-    airport_period: pd.DataFrame,
-    airport_mix: pd.DataFrame,
-    recovery_summary: pd.DataFrame,
+    overall_monthly: pd.DataFrame,
+    include_extended_outputs: bool = True,
+) -> dict[str, pd.DataFrame]:
+    airport_share = build_airport_share_summary(airport_monthly, overall_monthly)
+    airport_panel = build_airport_panel_summary(airport_share)
+    regression_coefficients, regression_diagnostics = build_airport_regression_outputs(
+        airport_panel
+    )
+    output_bundle = {
+        "airport_monthly": airport_monthly,
+        "airport_share": airport_share,
+        "airport_panel": airport_panel,
+        "regression_coefficients": regression_coefficients,
+        "regression_diagnostics": regression_diagnostics,
+    }
+    if include_extended_outputs:
+        airport_period = build_airport_period_summary(airport_monthly)
+        output_bundle["airport_period"] = airport_period
+        output_bundle["airport_mix"] = build_airport_mix_summary(airport_monthly)
+        output_bundle["recovery_summary"] = build_recovery_summary(airport_period)
+    return output_bundle
+
+
+def save_named_outputs(
+    output_frames: dict[str, pd.DataFrame],
+    output_files: dict[str, str],
     output_dir: str | Path,
 ) -> None:
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    airport_monthly.to_csv(output_dir / "airport_monthly_summary.csv", index=False)
-    airport_share.to_csv(output_dir / "airport_monthly_share.csv", index=False)
-    airport_period.to_csv(output_dir / "airport_period_summary.csv", index=False)
-    airport_mix.to_csv(output_dir / "airport_monthly_mix.csv", index=False)
-    recovery_summary.to_csv(output_dir / "airport_recovery_summary.csv", index=False)
+    for key, filename in output_files.items():
+        output_frames[key].to_csv(output_dir / filename, index=False)
+
+
+def run_airport_analysis(
+    data_dir: str | Path = q.DEFAULT_DATA_DIR,
+    db_path: str = q.DEFAULT_DB_PATH,
+    output_dir: str | Path = DEFAULT_OUTPUT_DIR,
+) -> dict[str, pd.DataFrame | list[str]]:
+    overall_monthly, overall_skips = q.build_monthly_summary(
+        data_dir=data_dir,
+        db_path=db_path,
+    )
+    airport_monthly, airport_skips = build_airport_monthly_summary(
+        data_dir=data_dir,
+        db_path=db_path,
+    )
+    pickup_only_monthly, pickup_only_skips = build_airport_monthly_summary(
+        data_dir=data_dir,
+        db_path=db_path,
+        airport_definition="pickup_only",
+    )
+
+    skipped_sources = sorted(set(overall_skips + airport_skips + pickup_only_skips))
+
+    if overall_monthly.empty or airport_monthly.empty:
+        return {
+            "overall_monthly": overall_monthly,
+            "airport_monthly": airport_monthly,
+            "skipped_sources": skipped_sources,
+        }
+
+    main_outputs = build_airport_output_bundle(airport_monthly, overall_monthly)
+    pickup_only_outputs = build_airport_output_bundle(
+        pickup_only_monthly,
+        overall_monthly,
+        include_extended_outputs=False,
+    )
+
+    save_named_outputs(main_outputs, MAIN_OUTPUT_FILES, output_dir)
+    save_named_outputs(pickup_only_outputs, ROBUSTNESS_OUTPUT_FILES, output_dir)
+
+    return {
+        "overall_monthly": overall_monthly,
+        "skipped_sources": skipped_sources,
+        **main_outputs,
+        "pickup_only_monthly": pickup_only_outputs["airport_monthly"],
+        "pickup_only_share": pickup_only_outputs["airport_share"],
+        "pickup_only_panel": pickup_only_outputs["airport_panel"],
+        "pickup_only_regression_coefficients": pickup_only_outputs[
+            "regression_coefficients"
+        ],
+        "pickup_only_regression_diagnostics": pickup_only_outputs[
+            "regression_diagnostics"
+        ],
+    }
+
+
+def load_saved_airport_outputs(
+    output_dir: str | Path = DEFAULT_OUTPUT_DIR,
+) -> dict[str, pd.DataFrame]:
+    output_dir = Path(output_dir)
+    outputs: dict[str, pd.DataFrame] = {}
+    for key, filename in MAIN_OUTPUT_FILES.items():
+        path = output_dir / filename
+        if not path.exists():
+            raise FileNotFoundError(f"Missing required RQ2 output file: {path}")
+        outputs[key] = pd.read_csv(path)
+    for key, filename in ROBUSTNESS_OUTPUT_FILES.items():
+        if key not in {"regression_coefficients", "regression_diagnostics"}:
+            continue
+        path = output_dir / filename
+        if not path.exists():
+            raise FileNotFoundError(f"Missing required RQ2 output file: {path}")
+        outputs[f"pickup_only_{key}"] = pd.read_csv(path)
+    return outputs
 
 
 def parse_args() -> argparse.Namespace:
@@ -187,34 +322,28 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
 
-    overall_monthly, overall_skips = q.build_monthly_summary(
+    results = run_airport_analysis(
         data_dir=args.data_dir,
         db_path=args.db_path,
+        output_dir=args.output_dir,
     )
-    airport_monthly, airport_skips = build_airport_monthly_summary(
-        data_dir=args.data_dir,
-        db_path=args.db_path,
-    )
+    overall_monthly = results["overall_monthly"]
+    airport_monthly = results["airport_monthly"]
+    skipped_sources = results["skipped_sources"]
 
-    skipped_sources = sorted(set(overall_skips + airport_skips))
-
-    if overall_monthly.empty or airport_monthly.empty:
+    if (
+        isinstance(overall_monthly, pd.DataFrame)
+        and isinstance(airport_monthly, pd.DataFrame)
+        and (overall_monthly.empty or airport_monthly.empty)
+    ):
         print("Airport analysis could not be built from the local parquet files.")
         return 1
 
-    airport_share = build_airport_share_summary(airport_monthly, overall_monthly)
-    airport_period = build_airport_period_summary(airport_monthly)
-    airport_mix = build_airport_mix_summary(airport_monthly)
-    recovery_summary = build_recovery_summary(airport_period)
-
-    save_outputs(
-        airport_monthly=airport_monthly,
-        airport_share=airport_share,
-        airport_period=airport_period,
-        airport_mix=airport_mix,
-        recovery_summary=recovery_summary,
-        output_dir=args.output_dir,
-    )
+    airport_share = results["airport_share"]
+    airport_period = results["airport_period"]
+    regression_coefficients = results["regression_coefficients"]
+    regression_diagnostics = results["regression_diagnostics"]
+    pickup_only_regression_coefficients = results["pickup_only_regression_coefficients"]
     print("\nAirport period summary:")
     print(airport_period)
 
@@ -231,6 +360,53 @@ def main() -> int:
                 "airport_trip_share",
             ]
         ].head(12)
+    )
+
+    print("\nAirport panel regression coefficients:")
+    print(
+        regression_coefficients[
+            regression_coefficients["term"].isin(
+                [
+                    "is_jfk",
+                    "jfk_x_covid",
+                    "jfk_x_intermediate",
+                    "jfk_x_post_covid",
+                ]
+            )
+        ][
+            [
+                "model",
+                "term",
+                "coefficient",
+                "robust_se",
+                "p_value_normal_approx",
+            ]
+        ]
+    )
+
+    print("\nAirport regression diagnostics:")
+    print(regression_diagnostics)
+
+    print("\nPickup-only robustness regression coefficients:")
+    print(
+        pickup_only_regression_coefficients[
+            pickup_only_regression_coefficients["term"].isin(
+                [
+                    "is_jfk",
+                    "jfk_x_covid",
+                    "jfk_x_intermediate",
+                    "jfk_x_post_covid",
+                ]
+            )
+        ][
+            [
+                "model",
+                "term",
+                "coefficient",
+                "robust_se",
+                "p_value_normal_approx",
+            ]
+        ]
     )
 
     print(f"\nSaved CSV outputs to {Path(args.output_dir).resolve()}")

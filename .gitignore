@@ -5,3 +5,5 @@ taxi_data/
 *.duckdb
 figures/
 outputs/
+
+final_report_template/

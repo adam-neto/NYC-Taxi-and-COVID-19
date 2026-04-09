@@ -21,7 +21,7 @@ EXPECTED_TITLES = {
     8: "RQ2: Regression Evidence",
     9: "RQ3: Cashless Shift Descriptively",
     10: "RQ3: Model-Based Evaluation",
-    11: "Discussion, What Did Not Work, and Limitations",
+    11: "Discussion and Limitations",
     12: "Conclusion",
     13: "Backup: RQ2 Coefficient Table",
     14: "Backup: RQ3 Full Metrics Table",

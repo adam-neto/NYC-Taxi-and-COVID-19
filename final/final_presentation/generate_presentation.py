@@ -217,7 +217,7 @@ def make_title_slide(prs: Presentation):
         slide,
         "Adam",
         "0:40",
-        "We are Group 10, and our final project studies how COVID-19 changed New York City yellow taxi behavior before, during, and after the main disruption period. Instead of looking only at whether taxi activity fell, we ask a broader question: which behaviors bounced back, and which ones stayed changed. We answer that through three research questions on tipping, airport recovery, and the shift from cash to cashless payments.",
+        "We are Group 10, and our project studies how COVID-19 changed New York City yellow taxi behavior before, during, and after the main disruption period. We study three dimensions of that change: tipping behavior, airport-related recovery, and the shift from cash to cashless payments.",
     )
 
 
@@ -279,15 +279,15 @@ def add_two_image_slide(
 def add_round_robin_discussion_slide(prs: Presentation, number: int):
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     set_background(slide)
-    add_title(slide, "Discussion, What Did Not Work, and Limitations", "Presenters: Adam, Harsh, Chris | Target time: 1:15")
+    add_title(slide, "Discussion and Limitations", "Presenters: Adam, Harsh, Chris | Target time: 1:15")
 
     col_x = [0.65, 4.55, 8.45]
-    headers = ["RQ1 Revision", "RQ2 Revision", "RQ3 Revision"]
+    headers = ["RQ1 Measurement", "RQ2 Outcome", "RQ3 Evaluation"]
     fills = [LIGHT_GOLD, LIGHT_BLUE, LIGHT_RED]
     bodies = [
-        ["All-trip tipping was not reliable", "Cash tips are not fully observed", "Final choice: credit-card trips only"],
-        ["Raw airport counts were not enough", "Overall taxi demand also collapsed", "Final choice: share-based comparison + robustness checks"],
-        ["Raw accuracy separated models poorly", "The test set is imbalanced toward cashless trips", "Final choice: emphasize ROC-AUC and average precision"],
+        ["Tipping is measured on credit-card trips", "Cash tips are not fully observed", "Interpretation is limited to recorded card tips"],
+        ["Airport trip share is the primary outcome", "This accounts for swings in total yellow taxi demand", "Robustness checks are also reported"],
+        ["ROC-AUC and average precision are emphasized", "The test set is imbalanced toward cashless trips", "Accuracy alone is not enough"],
     ]
 
     for idx in range(3):
@@ -309,7 +309,7 @@ def add_round_robin_discussion_slide(prs: Presentation, number: int):
         slide,
         "Shared round-robin",
         "1:15",
-        "Adam: For RQ2, one thing we learned is that raw airport counts by themselves were not enough, because the entire yellow taxi system also changed so much. That is why the share-based comparison became our main descriptive and inferential outcome.\nHarsh: For RQ1, we could not treat all tipping data the same way because cash tips are not fully observed in the TLC records. That is why the final analysis focuses on credit-card trips only.\nChris: For RQ3, raw accuracy did not separate the models very well because the held-out test set is imbalanced toward cashless trips. That is why we rely more on ROC-AUC and average precision when comparing the models.\nAdam close: Across all three questions, the broader limitation is that this is evidence about yellow taxi behavior, not a causal statement about all travel in New York City.",
+        "Adam: For RQ2, the main comparative outcome is airport trip share, because total yellow taxi demand also changes a lot across the study window.\nHarsh: For RQ1, tipping is measured on credit-card trips, because cash tips are not fully observed in the TLC records.\nChris: For RQ3, ROC-AUC and average precision are the most informative model metrics here, because the held-out test set is imbalanced toward cashless trips.\nAdam close: Across all three questions, the broader limitation is that this is evidence about yellow taxi behavior, not a causal statement about all travel in New York City.",
     )
 
 
@@ -354,10 +354,10 @@ def build_deck():
         [
             "COVID changed more than total trip volume",
             "Taxi data reveals behavior inside trips: when people travel, how they tip, how they pay, and what types of trips recover",
-            "The project asks which travel behaviors bounced back and which ones stayed changed",
-            "Yellow taxi records provide trip-level evidence instead of broad citywide anecdotes",
+            "Different travel behaviors recovered at different rates",
+            "Yellow taxi records provide trip-level evidence beyond broad citywide anecdotes",
         ],
-        "This problem matters because COVID did not only reduce mobility, it also changed how people traveled, how they paid, and how different types of trips recovered. Yellow taxi data is useful because it gives trip-level information on time, fare, tips, payment type, and pickup and dropoff locations. That means we can study not just whether demand fell, but whether rider behavior inside trips changed in ways that persisted after the initial shock.",
+        "This problem matters because COVID did not only reduce mobility, it also changed how people traveled, how they paid, and how different types of trips recovered. Yellow taxi data is useful because it gives trip-level information on time, fare, tips, payment type, and pickup and dropoff locations. That lets us study behavioral change inside trips as well as changes in overall demand.",
         {"title": "Core lens", "lines": ["Trip-level TLC records", "Behavior within trips", "Recovery over 2019-2023"], "fill": LIGHT_GOLD},
     )
 
@@ -368,12 +368,12 @@ def build_deck():
         "Chris",
         "1:10",
         [
-            "RQ1: How did recorded tipping behavior change across the four project periods?",
+            "RQ1: How did recorded tipping behavior change across the four study periods?",
             "RQ2: Did JFK and LaGuardia recover differently after the COVID shock?",
             "RQ3: Did COVID accelerate the shift from cash to cashless payments, and did that change persist?",
             "Shared contributions: common 4-period design, reproducible DuckDB pipeline, descriptive + inferential + ML evidence",
         ],
-        "Our first research question asks how recorded tipping behavior changed over time. Our second asks whether airport-related yellow taxi recovery differed between JFK and LaGuardia, which makes the airport story more specific and less trivial. Our third asks whether COVID accelerated the shift from cash to cashless payments and whether that change persisted. Across all three questions, the main contribution is a common recovery framework built on the same data source, the same period definitions, and a reproducible analysis pipeline.",
+        "Our first research question asks how recorded tipping behavior changed over time. Our second asks whether airport-related yellow taxi recovery differed between JFK and LaGuardia. Our third asks whether COVID accelerated the shift from cash to cashless payments and whether that change persisted. Across all three questions, the main contribution is a common recovery framework built on the same data source, the same period definitions, and a reproducible analysis pipeline.",
         {"title": "Four periods", "lines": ["2019 pre-COVID", "2020 COVID", "2021-2022 intermediate", "2023 post-COVID"]},
     )
 
@@ -390,7 +390,7 @@ def build_deck():
             "Key fields: timestamps, fare, tip, payment type, passenger count, trip distance, pickup and dropoff zones",
             "Four periods: pre-COVID, COVID, intermediate recovery, post-COVID",
         ],
-        "Our dataset is the New York City TLC yellow taxi trip record data from January 2019 through December 2023, plus the taxi zone lookup table. In total, our study window contains 60 monthly files and about 218.1 million yellow taxi trips. The key inputs are trip time, fare, tip, payment type, distance, passenger count, and pickup and dropoff locations. We organize the analysis into four periods: pre-COVID in 2019, the disruption year in 2020, an intermediate recovery period in 2021 and 2022, and a post-COVID period in 2023. That intermediate period is important because otherwise the story would jump too abruptly from the shock to the recovery.",
+        "Our dataset is the New York City TLC yellow taxi trip record data from January 2019 through December 2023, plus the taxi zone lookup table. In total, our study window contains 60 monthly files and about 218.1 million yellow taxi trips. The key inputs are trip time, fare, tip, payment type, distance, passenger count, and pickup and dropoff locations. We organize the analysis into four periods: pre-COVID in 2019, the disruption year in 2020, an intermediate recovery period in 2021 and 2022, and a post-COVID period in 2023. This four-period structure lets us compare the initial shock with the later recovery path.",
         {"title": "Why 2021-2022 matters", "lines": ["Captures uneven reopening", "Prevents a misleading jump from 2020 straight to 2023"], "fill": LIGHT_GOLD},
     )
 
@@ -407,7 +407,7 @@ def build_deck():
             "RQ2 identifies airport-linked trips and estimates a monthly panel regression",
             "RQ3 groups payment types and adds a held-out ML evaluation",
         ],
-        "All three research questions are built on the same DuckDB-based query workflow rather than one giant in-memory dataframe. The shared script reads the local parquet files, assigns each month to one of the four project periods, and produces a consistent base for the downstream analyses. From there, each research question applies its own filters and methodology: RQ1 focuses on valid credit-card trips, RQ2 identifies airport-related trips and estimates a panel regression, and RQ3 groups payment types and then adds a held-out machine learning evaluation.",
+        "All three research questions use the same DuckDB-based query workflow on the local parquet files. The shared script assigns each month to one of the four study periods and produces a consistent base for the downstream analyses. From there, each research question applies its own filters and methodology: RQ1 focuses on valid credit-card trips, RQ2 identifies airport-related trips and estimates a panel regression, and RQ3 groups payment types and then adds a held-out machine learning evaluation.",
         {"title": "Pipeline", "lines": ["Preprocess", "Question-specific filtering", "Summaries and models", "Figure generation"]},
     )
 
@@ -441,11 +441,11 @@ def build_deck():
         "Monthly airport-related yellow taxi trip counts",
         "Airport trips as a share of all yellow taxi trips",
         [
-            "Sharpened question: did JFK and LaGuardia recover differently?",
+            "Comparison: JFK and LaGuardia airport-related recovery",
             "Both airports collapsed in 2020",
             "JFK recovered more strongly in counts and system share",
         ],
-        "We sharpened RQ2 so that it is not just the obvious statement that airport trips fell during COVID. Instead, we ask whether JFK and LaGuardia recovered differently. Descriptively, both airports collapse in 2020, but JFK recovers more strongly afterward, both in absolute monthly volume and as a share of the yellow taxi system. By 2023, JFK is back to about 70.4 percent of its 2019 airport-trip volume, while LaGuardia is at about 57.7 percent. Because the intermediate period covers two years, we focus on average monthly comparisons rather than raw period totals so the comparison stays fair.",
+        "RQ2 compares airport-related yellow taxi recovery at JFK and LaGuardia. Descriptively, both airports collapse in 2020, but JFK recovers more strongly afterward, both in absolute monthly volume and as a share of the yellow taxi system. By 2023, JFK is back to about 70.4 percent of its 2019 airport-trip volume, while LaGuardia is at about 57.7 percent. Because the intermediate period covers two years, we focus on average monthly comparisons rather than raw period totals so the comparison stays fair.",
         {"title": "2023 recovery index", "lines": ["JFK: 0.704", "LaGuardia: 0.577"], "fill": LIGHT_BLUE},
     )
 
@@ -473,7 +473,7 @@ def build_deck():
         slide8,
         "Adam then Chris",
         "1:20",
-        "Adam: To move beyond the descriptive plots, we estimate a monthly airport panel regression where LaGuardia and the 2019 baseline are the reference categories, and the key evidence comes from the JFK-by-period interaction terms.\nChris: The COVID interaction is not meaningfully different from zero, but the later interactions are both positive and statistically significant. The intermediate interaction is about positive 0.0108 with a p-value of about 0.003, and the post-COVID interaction is about positive 0.0125 with a p-value below one times ten to the negative ninth. In plain terms, the difference between the airports becomes clearest during the recovery rather than during the initial collapse, and that result also survives the pickup-only robustness check.",
+        "Adam: We estimate a monthly airport panel regression where LaGuardia and the 2019 baseline are the reference categories, and the key evidence comes from the JFK-by-period interaction terms.\nChris: The COVID interaction is not meaningfully different from zero, but the later interactions are both positive and statistically significant. The intermediate interaction is about positive 0.0108 with a p-value of about 0.003, and the post-COVID interaction is about positive 0.0125 with a p-value below one times ten to the negative ninth. In plain terms, the difference between the airports becomes clearest during the recovery rather than during the initial collapse, and that result also survives the pickup-only robustness check.",
     )
 
     add_two_image_slide(
@@ -488,10 +488,10 @@ def build_deck():
         "Payment mix by project period",
         [
             "Cashless payment was already common before COVID",
-            "The real question is acceleration and persistence",
+            "Cashless usage continues to rise across the study window",
             "Known-payment cashless share: 72.59% -> 73.96% -> 78.46% -> 82.34%",
         ],
-        "For RQ3, the key point is not that cashless payment suddenly appeared during COVID, because it was already common before the pandemic. The real question is whether the pandemic accelerated the shift and whether that shift persisted. Using cashless share among known payment trips, the baseline is 72.59 percent in 2019, which rises to 73.96 percent in 2020, 78.46 percent in the intermediate period, and 82.34 percent in 2023. That is a gain of about 9.75 percentage points relative to the baseline by the end of the study window. We treat known-payment share as the primary measure because ambiguous payment codes vary over time, so the all-trip version is less clean for interpretation.",
+        "For RQ3, cashless payment is already common before COVID, but it becomes even more prevalent over the study window. Using cashless share among known payment trips, the baseline is 72.59 percent in 2019, which rises to 73.96 percent in 2020, 78.46 percent in the intermediate period, and 82.34 percent in 2023. That is a gain of about 9.75 percentage points relative to the baseline by the end of the study window. We treat known-payment share as the primary measure because ambiguous payment codes vary over time, so the all-trip version is less clean for interpretation.",
         {"title": "Change vs. baseline", "lines": ["COVID: +1.38 pp", "Intermediate: +5.87 pp", "Post-COVID: +9.75 pp"], "fill": LIGHT_RED},
     )
 
@@ -520,7 +520,7 @@ def build_deck():
         slide10,
         "Harsh then Chris",
         "1:25",
-        "Harsh: RQ3 is also the section that directly satisfies the final modeling requirement. We train on known-payment trips before July 2023 and test on 56,105 held-out trips from July 2023 onward, with 513,206 training rows. Accuracy alone is not very helpful because the test set is heavily tilted toward cashless trips, so even the dummy baseline that always predicts the majority class reaches high accuracy.\nChris: The more meaningful comparison is ROC-AUC, where logistic regression improves from 0.500 to 0.581, which is a 16.25 percent improvement over the dummy baseline, and XGBoost improves further to 0.638, which is a 27.54 percent improvement. That tells us the trip features contain real predictive signal, and the importance plot also shows that period indicators remain among the strongest features even after controlling for trip context.",
+        "Harsh: For RQ3, we complement the descriptive analysis with a held-out prediction task. We train on known-payment trips before July 2023 and test on 56,105 held-out trips from July 2023 onward, with 513,206 training rows. Accuracy alone is not very helpful because the test set is heavily tilted toward cashless trips, so even the dummy baseline that always predicts the majority class reaches high accuracy.\nChris: The more meaningful comparison is ROC-AUC, where logistic regression improves from 0.500 to 0.581, which is a 16.25 percent improvement over the dummy baseline, and XGBoost improves further to 0.638, which is a 27.54 percent improvement. That tells us the trip features contain real predictive signal, and the importance plot also shows that period indicators remain among the strongest features even after controlling for trip context.",
     )
 
     add_round_robin_discussion_slide(prs, 11)

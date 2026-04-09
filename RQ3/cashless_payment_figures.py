@@ -1,4 +1,7 @@
+#!/usr/bin/env python3
+
 from __future__ import annotations
+
 import argparse
 import os
 from pathlib import Path
@@ -10,6 +13,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
+import seaborn as sns
 
 RQ3_DIR = Path(__file__).resolve().parent
 ROOT_DIR = RQ3_DIR.parent
@@ -20,69 +24,65 @@ if str(RQ3_DIR) not in sys.path:
 
 import query_taxi_duckdb as q
 from cashless_payment_analysis import (
-    DEFAULT_LOOKUP_PATH,
     DEFAULT_OUTPUT_DIR,
     PERIOD_ORDER,
     BOROUGH_ORDER,
-    build_borough_monthly_summary,
-    build_borough_period_summary,
-    build_cashless_change_summary,
-    build_cashless_monthly_summary,
-    build_cashless_period_summary,
-    save_outputs,
+    DEFAULT_LOOKUP_PATH,
+    load_saved_cashless_outputs,
+    run_cashless_analysis,
 )
+from cashless_payment_model import DEFAULT_SAMPLE_ROWS_PER_MONTH
 
 DEFAULT_FIGURE_DIR = RQ3_DIR / "figures"
+PERIOD_LABELS = {
+    "pre_covid": "Pre-COVID",
+    "covid": "COVID",
+    "intermediate": "Intermediate",
+    "post_covid": "Post-COVID",
+}
 
 
 def add_month_start(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    df["month_start"] = pd.to_datetime(
-        dict(year=df["year"], month=df["month"], day=1)
-    )
+    df["month_start"] = pd.to_datetime(dict(year=df["year"], month=df["month"], day=1))
     return df
 
 
-def plot_monthly_cashless_share(
-    cashless_monthly: pd.DataFrame,
-    figure_dir: str | Path,
-) -> None:
+def plot_monthly_cashless_share(cashless_monthly: pd.DataFrame, figure_dir: str | Path) -> None:
     figure_dir = Path(figure_dir)
     figure_dir.mkdir(parents=True, exist_ok=True)
 
     plot_df = add_month_start(cashless_monthly)
     plt.figure(figsize=(12, 6))
-    plt.plot(
-        plot_df["month_start"],
-        plot_df["cashless_share_known_payments"] * 100,
+    sns.lineplot(
+        data=plot_df,
+        x="month_start",
+        y=plot_df["cashless_share_known_payments"] * 100,
         marker="o",
         label="Cashless share among known payments",
     )
-    plt.plot(
-        plot_df["month_start"],
-        plot_df["cashless_share_all_trips"] * 100,
+    sns.lineplot(
+        data=plot_df,
+        x="month_start",
+        y=plot_df["cashless_share_all_trips"] * 100,
         marker="o",
         label="Cashless share among all trips",
     )
-    plt.axvline(pd.Timestamp("2020-03-01"), linestyle="--", linewidth=1)
+    plt.axvline(pd.Timestamp("2020-03-01"), color="black", linestyle="--", linewidth=1)
     plt.title("Monthly Cashless Share for NYC Yellow Taxi Trips")
     plt.xlabel("Month")
     plt.ylabel("Cashless share (%)")
-    plt.legend()
     plt.tight_layout()
     plt.savefig(figure_dir / "monthly_cashless_share.png", dpi=200)
     plt.close()
 
 
-
-def plot_period_payment_mix(
-    cashless_period: pd.DataFrame,
-    figure_dir: str | Path,
-) -> None:
+def plot_period_payment_mix(cashless_period: pd.DataFrame, figure_dir: str | Path) -> None:
     figure_dir = Path(figure_dir)
     figure_dir.mkdir(parents=True, exist_ok=True)
 
     plot_df = cashless_period.copy()
+    plot_df["period_label"] = plot_df["period"].map(PERIOD_LABELS)
     x = range(len(plot_df))
     cashless_pct = plot_df["cashless_share_all_trips"] * 100
     cash_pct = (plot_df["cash_trip_count"] / plot_df["all_trip_count"]) * 100
@@ -92,7 +92,7 @@ def plot_period_payment_mix(
     plt.bar(x, cashless_pct, label="Cashless")
     plt.bar(x, cash_pct, bottom=cashless_pct, label="Cash")
     plt.bar(x, ambiguous_pct, bottom=cashless_pct + cash_pct, label="Ambiguous / other")
-    plt.xticks(list(x), plot_df["period"])
+    plt.xticks(list(x), plot_df["period_label"])
     plt.title("Payment Mix by Project Period")
     plt.xlabel("Period")
     plt.ylabel("Share of trips (%)")
@@ -102,80 +102,48 @@ def plot_period_payment_mix(
     plt.close()
 
 
-
-def plot_period_cashless_change(
-    cashless_change: pd.DataFrame,
-    figure_dir: str | Path,
-) -> None:
+def plot_model_metric_comparison(model_metrics: pd.DataFrame, figure_dir: str | Path) -> None:
     figure_dir = Path(figure_dir)
     figure_dir.mkdir(parents=True, exist_ok=True)
-
-    plot_df = cashless_change[cashless_change["period"] != "pre_covid"].copy()
-    x = range(len(plot_df))
-
-    plt.figure(figsize=(10, 6))
-    plt.bar(x, plot_df["cashless_share_known_change_pp"])
-    plt.axhline(0.0, linestyle="--", linewidth=1)
-    plt.xticks(list(x), plot_df["period"])
-    plt.title("Change in Cashless Share vs Pre-COVID")
-    plt.xlabel("Period")
-    plt.ylabel("Percentage-point change\n(among known payment trips)")
+    plot_df = model_metrics.melt(
+        id_vars="model",
+        value_vars=["accuracy", "precision", "recall", "f1", "roc_auc"],
+        var_name="metric",
+        value_name="score",
+    )
+    plt.figure(figsize=(11, 6))
+    sns.barplot(data=plot_df, x="metric", y="score", hue="model")
+    plt.ylim(0, 1)
+    plt.title("RQ3 Model Comparison on Held-Out 2023 Test Months")
+    plt.xlabel("Metric")
+    plt.ylabel("Score")
     plt.tight_layout()
-    plt.savefig(figure_dir / "cashless_share_change_vs_pre_covid.png", dpi=200)
+    plt.savefig(figure_dir / "cashless_model_metric_comparison.png", dpi=200)
     plt.close()
 
 
-
-def plot_borough_cashless_share(
-    borough_period: pd.DataFrame,
-    figure_dir: str | Path,
-) -> None:
-    if borough_period.empty:
-        return
-
+def plot_xgboost_feature_importance(model_top_features: pd.DataFrame, figure_dir: str | Path) -> None:
     figure_dir = Path(figure_dir)
     figure_dir.mkdir(parents=True, exist_ok=True)
-
-    plot_df = borough_period[
-        borough_period["borough"].isin(BOROUGH_ORDER)
-    ].copy()
+    plot_df = model_top_features[model_top_features["model"] == "xgboost"].copy()
     if plot_df.empty:
         return
-
-    pivot = (
-        plot_df.pivot(
-            index="borough",
-            columns="period",
-            values="cashless_share_known_payments",
-        )
-        .reindex(BOROUGH_ORDER)
-        .reindex(columns=PERIOD_ORDER)
-        * 100
-    )
-
-    ax = pivot.plot(kind="bar", figsize=(12, 6))
-    ax.set_title("Cashless Share by Pickup Borough and Period")
-    ax.set_xlabel("Pickup borough")
-    ax.set_ylabel("Cashless share among known payments (%)")
-    ax.legend(title="Period")
+    plot_df = plot_df.head(12).iloc[::-1]
+    plt.figure(figsize=(10, 7))
+    sns.barplot(data=plot_df, x="abs_value", y="feature")
+    plt.title("Top XGBoost Features for Predicting Cashless Payments")
+    plt.xlabel("Importance")
+    plt.ylabel("Feature")
     plt.tight_layout()
-    plt.savefig(figure_dir / "borough_cashless_share.png", dpi=200)
+    plt.savefig(figure_dir / "cashless_xgboost_feature_importance.png", dpi=200)
     plt.close()
 
 
-
-def create_figures(
-    cashless_monthly: pd.DataFrame,
-    cashless_period: pd.DataFrame,
-    cashless_change: pd.DataFrame,
-    borough_period: pd.DataFrame,
-    figure_dir: str | Path,
-) -> None:
-    plot_monthly_cashless_share(cashless_monthly, figure_dir)
-    plot_period_payment_mix(cashless_period, figure_dir)
-    plot_period_cashless_change(cashless_change, figure_dir)
-    plot_borough_cashless_share(borough_period, figure_dir)
-
+def create_figures(outputs: dict[str, pd.DataFrame], figure_dir: str | Path) -> None:
+    plot_monthly_cashless_share(outputs["cashless_monthly"], figure_dir)
+    plot_period_payment_mix(outputs["cashless_period"], figure_dir)
+    plot_model_metric_comparison(outputs["model_metrics"], figure_dir)
+    plot_xgboost_feature_importance(outputs["model_top_features"], figure_dir)
 
 
 def parse_args() -> argparse.Namespace:
@@ -195,7 +163,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--lookup-path",
         default=DEFAULT_LOOKUP_PATH,
-        help="path to taxi_zone_lookup.csv for borough summaries",
+        help="path to taxi_zone_lookup.csv for borough and modeling joins",
     )
     parser.add_argument(
         "--output-dir",
@@ -207,49 +175,44 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_FIGURE_DIR,
         help="directory to write figure outputs",
     )
+    parser.add_argument(
+        "--sample-rows-per-month",
+        type=int,
+        default=DEFAULT_SAMPLE_ROWS_PER_MONTH,
+        help="number of known-payment trips to sample per month for the ML model",
+    )
     return parser.parse_args()
-
 
 
 def main() -> int:
     args = parse_args()
+    reused_saved_outputs = False
 
-    cashless_monthly, cashless_skips = build_cashless_monthly_summary(
-        data_dir=args.data_dir,
-        db_path=args.db_path,
-    )
-    if cashless_monthly.empty:
-        print("Cashless payment figures could not be built from the local parquet files.")
-        return 1
+    try:
+        outputs = load_saved_cashless_outputs(args.output_dir)
+        skipped_sources: list[str] = []
+        reused_saved_outputs = True
+    except FileNotFoundError:
+        print("RQ3 analysis outputs not found. Running cashless_payment_analysis first...")
+        results = run_cashless_analysis(
+            data_dir=args.data_dir,
+            db_path=args.db_path,
+            lookup_path=args.lookup_path,
+            output_dir=args.output_dir,
+            sample_rows_per_month=args.sample_rows_per_month,
+        )
+        if results["cashless_monthly"].empty or results["model_metrics"].empty:
+            print("Cashless figures could not be built from the local parquet files.")
+            return 1
+        outputs = load_saved_cashless_outputs(args.output_dir)
+        skipped_sources = results["skipped_sources"]
 
-    cashless_period = build_cashless_period_summary(cashless_monthly)
-    cashless_change = build_cashless_change_summary(cashless_period)
+    create_figures(outputs, args.figure_dir)
 
-    borough_monthly, borough_skips = build_borough_monthly_summary(
-        lookup_path=args.lookup_path,
-        data_dir=args.data_dir,
-        db_path=args.db_path,
-    )
-    borough_period = build_borough_period_summary(borough_monthly)
-
-    skipped_sources = sorted(set(cashless_skips + borough_skips))
-
-    save_outputs(
-        cashless_monthly=cashless_monthly,
-        cashless_period=cashless_period,
-        cashless_change=cashless_change,
-        borough_period=borough_period,
-        output_dir=args.output_dir,
-    )
-    create_figures(
-        cashless_monthly=cashless_monthly,
-        cashless_period=cashless_period,
-        cashless_change=cashless_change,
-        borough_period=borough_period,
-        figure_dir=args.figure_dir,
-    )
-
-    print(f"Saved CSV outputs to {Path(args.output_dir).resolve()}")
+    if reused_saved_outputs:
+        print(f"Reused saved CSV outputs from {Path(args.output_dir).resolve()}")
+    else:
+        print(f"Saved CSV outputs to {Path(args.output_dir).resolve()}")
     print(f"Saved figures to {Path(args.figure_dir).resolve()}")
 
     if skipped_sources:

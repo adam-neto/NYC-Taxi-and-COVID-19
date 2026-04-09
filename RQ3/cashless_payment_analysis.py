@@ -1,20 +1,44 @@
+#!/usr/bin/env python3
+
 from __future__ import annotations
+
 import argparse
 from pathlib import Path
 import sys
+
 import pandas as pd
 
 RQ3_DIR = Path(__file__).resolve().parent
 ROOT_DIR = RQ3_DIR.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
+if str(RQ3_DIR) not in sys.path:
+    sys.path.insert(0, str(RQ3_DIR))
 
 import query_taxi_duckdb as q
+from cashless_payment_model import (
+    DEFAULT_LOOKUP_PATH,
+    DEFAULT_SAMPLE_ROWS_PER_MONTH,
+    build_cashless_model_outputs,
+    sample_cashless_trip_modeling_data,
+)
 
 DEFAULT_OUTPUT_DIR = RQ3_DIR / "outputs"
-DEFAULT_LOOKUP_PATH = q.DEFAULT_DATA_DIR + "/taxi_zone_lookup.csv"
 PERIOD_ORDER = ["pre_covid", "covid", "intermediate", "post_covid"]
 BOROUGH_ORDER = ["Bronx", "Brooklyn", "Manhattan", "Queens", "Staten Island"]
+MAIN_OUTPUT_FILES = {
+    "cashless_monthly": "cashless_monthly_summary.csv",
+    "cashless_period": "cashless_period_summary.csv",
+    "cashless_change": "cashless_change_summary.csv",
+    "borough_period": "cashless_borough_period_summary.csv",
+    "model_split_summary": "cashless_model_split_summary.csv",
+    "model_metrics": "cashless_model_metrics.csv",
+    "model_feature_importance": "cashless_model_feature_importance.csv",
+    "model_top_features": "cashless_model_top_features.csv",
+}
+OPTIONAL_OUTPUT_FILES = {
+    "model_predictions": "cashless_model_predictions.csv",
+}
 
 
 def build_cashless_monthly_summary(
@@ -120,6 +144,7 @@ def build_borough_monthly_summary(
     if not lookup_path.exists():
         return pd.DataFrame(), []
 
+    escaped_lookup = str(lookup_path).replace("'", "''")
     select_sql = f"""
         SELECT
             COALESCE(zone_lookup.Borough, 'Unknown') AS borough,
@@ -129,7 +154,7 @@ def build_borough_monthly_summary(
             SUM(CASE WHEN payment_type NOT IN (1, 2) OR payment_type IS NULL THEN 1 ELSE 0 END)
                 AS ambiguous_payment_trip_count
         FROM read_parquet('__SOURCE__', union_by_name = true) AS trips
-        LEFT JOIN read_csv_auto('{str(lookup_path).replace("'", "''")}') AS zone_lookup
+        LEFT JOIN read_csv_auto('{escaped_lookup}') AS zone_lookup
             ON trips.PULocationID = zone_lookup.LocationID
         GROUP BY borough
     """
@@ -173,22 +198,91 @@ def build_borough_period_summary(borough_monthly: pd.DataFrame) -> pd.DataFrame:
     return summary.reset_index(drop=True)
 
 
-def save_outputs(
-    cashless_monthly: pd.DataFrame,
-    cashless_period: pd.DataFrame,
-    cashless_change: pd.DataFrame,
-    borough_period: pd.DataFrame,
+def save_named_outputs(
+    output_frames: dict[str, pd.DataFrame],
+    output_files: dict[str, str],
     output_dir: str | Path,
 ) -> None:
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    for key, filename in output_files.items():
+        df = output_frames.get(key)
+        if df is None or df.empty:
+            continue
+        df.to_csv(output_dir / filename, index=False)
 
-    cashless_monthly.to_csv(output_dir / "cashless_monthly_summary.csv", index=False)
-    cashless_period.to_csv(output_dir / "cashless_period_summary.csv", index=False)
-    cashless_change.to_csv(output_dir / "cashless_change_summary.csv", index=False)
-    if not borough_period.empty:
-        borough_period.to_csv(output_dir / "cashless_borough_period_summary.csv", index=False)
 
+def run_cashless_analysis(
+    data_dir: str | Path = q.DEFAULT_DATA_DIR,
+    db_path: str = q.DEFAULT_DB_PATH,
+    lookup_path: str | Path = DEFAULT_LOOKUP_PATH,
+    output_dir: str | Path = DEFAULT_OUTPUT_DIR,
+    sample_rows_per_month: int = DEFAULT_SAMPLE_ROWS_PER_MONTH,
+) -> dict[str, pd.DataFrame | list[str]]:
+    cashless_monthly, cashless_skips = build_cashless_monthly_summary(
+        data_dir=data_dir,
+        db_path=db_path,
+    )
+    borough_monthly, borough_skips = build_borough_monthly_summary(
+        lookup_path=lookup_path,
+        data_dir=data_dir,
+        db_path=db_path,
+    )
+    modeling_df, modeling_skips = sample_cashless_trip_modeling_data(
+        lookup_path=lookup_path,
+        data_dir=data_dir,
+        db_path=db_path,
+        sample_rows_per_month=sample_rows_per_month,
+    )
+    skipped_sources = sorted(set(cashless_skips + borough_skips + modeling_skips))
+
+    if cashless_monthly.empty or modeling_df.empty:
+        return {
+            "cashless_monthly": cashless_monthly,
+            "modeling_df": modeling_df,
+            "skipped_sources": skipped_sources,
+        }
+
+    cashless_period = build_cashless_period_summary(cashless_monthly)
+    cashless_change = build_cashless_change_summary(cashless_period)
+    borough_period = build_borough_period_summary(borough_monthly)
+    model_outputs = build_cashless_model_outputs(modeling_df)
+
+    output_bundle: dict[str, pd.DataFrame] = {
+        "cashless_monthly": cashless_monthly,
+        "cashless_period": cashless_period,
+        "cashless_change": cashless_change,
+        "borough_period": borough_period,
+        **model_outputs,
+    }
+    save_named_outputs(output_bundle, MAIN_OUTPUT_FILES, output_dir)
+    save_named_outputs(output_bundle, OPTIONAL_OUTPUT_FILES, output_dir)
+
+    return {
+        **output_bundle,
+        "modeling_df": modeling_df,
+        "skipped_sources": skipped_sources,
+    }
+
+
+def load_saved_cashless_outputs(
+    output_dir: str | Path = DEFAULT_OUTPUT_DIR,
+) -> dict[str, pd.DataFrame]:
+    output_dir = Path(output_dir)
+    outputs: dict[str, pd.DataFrame] = {}
+    for key, filename in MAIN_OUTPUT_FILES.items():
+        path = output_dir / filename
+        if key == "borough_period" and not path.exists():
+            outputs[key] = pd.DataFrame()
+            continue
+        if not path.exists():
+            raise FileNotFoundError(f"Missing required RQ3 output file: {path}")
+        outputs[key] = pd.read_csv(path)
+    for key, filename in OPTIONAL_OUTPUT_FILES.items():
+        path = output_dir / filename
+        if path.exists():
+            outputs[key] = pd.read_csv(path)
+    return outputs
 
 
 def parse_args() -> argparse.Namespace:
@@ -208,93 +302,55 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--lookup-path",
         default=DEFAULT_LOOKUP_PATH,
-        help="path to taxi_zone_lookup.csv for borough summaries",
+        help="path to taxi_zone_lookup.csv for borough and modeling joins",
     )
     parser.add_argument(
         "--output-dir",
         default=DEFAULT_OUTPUT_DIR,
         help="directory to write CSV outputs",
     )
+    parser.add_argument(
+        "--sample-rows-per-month",
+        type=int,
+        default=DEFAULT_SAMPLE_ROWS_PER_MONTH,
+        help="number of known-payment trips to sample per month for the ML model",
+    )
     return parser.parse_args()
-
 
 
 def main() -> int:
     args = parse_args()
-
-    cashless_monthly, cashless_skips = build_cashless_monthly_summary(
+    results = run_cashless_analysis(
         data_dir=args.data_dir,
         db_path=args.db_path,
+        lookup_path=args.lookup_path,
+        output_dir=args.output_dir,
+        sample_rows_per_month=args.sample_rows_per_month,
     )
-    if cashless_monthly.empty:
+
+    cashless_monthly = results["cashless_monthly"]
+    modeling_df = results["modeling_df"]
+    skipped_sources = results["skipped_sources"]
+
+    if (
+        isinstance(cashless_monthly, pd.DataFrame)
+        and isinstance(modeling_df, pd.DataFrame)
+        and (cashless_monthly.empty or modeling_df.empty)
+    ):
         print("Cashless payment analysis could not be built from the local parquet files.")
         return 1
 
-    cashless_period = build_cashless_period_summary(cashless_monthly)
-    cashless_change = build_cashless_change_summary(cashless_period)
-
-    borough_monthly, borough_skips = build_borough_monthly_summary(
-        lookup_path=args.lookup_path,
-        data_dir=args.data_dir,
-        db_path=args.db_path,
-    )
-    borough_period = build_borough_period_summary(borough_monthly)
-
-    skipped_sources = sorted(set(cashless_skips + borough_skips))
-
-    save_outputs(
-        cashless_monthly=cashless_monthly,
-        cashless_period=cashless_period,
-        cashless_change=cashless_change,
-        borough_period=borough_period,
-        output_dir=args.output_dir,
-    )
-
     print("\nCashless period summary:")
-    print(
-        cashless_period[
-            [
-                "period",
-                "all_trip_count",
-                "cashless_trip_count",
-                "cash_trip_count",
-                "ambiguous_payment_trip_count",
-                "cashless_share_known_payments",
-                "cashless_share_all_trips",
-                "ambiguous_payment_share",
-            ]
-        ]
-    )
+    print(results["cashless_period"])
 
-    print("\nCashless monthly summary sample:")
-    print(
-        cashless_monthly[
-            [
-                "period",
-                "year",
-                "month",
-                "all_trip_count",
-                "cashless_trip_count",
-                "cash_trip_count",
-                "cashless_share_known_payments",
-                "cashless_share_all_trips",
-            ]
-        ].head(12)
-    )
+    print("\nModel train/test split summary:")
+    print(results["model_split_summary"])
 
-    if not borough_period.empty:
-        print("\nBorough period summary sample:")
-        print(
-            borough_period[
-                [
-                    "borough",
-                    "period",
-                    "all_trip_count",
-                    "cashless_share_known_payments",
-                    "ambiguous_payment_share",
-                ]
-            ].head(12)
-        )
+    print("\nModel metrics:")
+    print(results["model_metrics"])
+
+    print("\nTop model features:")
+    print(results["model_top_features"].groupby("model").head(10))
 
     print(f"\nSaved CSV outputs to {Path(args.output_dir).resolve()}")
 

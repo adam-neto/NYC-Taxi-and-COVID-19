@@ -18,7 +18,7 @@ The repository currently contains:
 - RQ1 analysis code for changes in tipping behavior
 - RQ2 analysis code for airport-related yellow taxi recovery at JFK and LaGuardia
 - a midterm report workspace, including a nested Overleaf Git repository
-- RQ3 analysis code for changes in cash versus cashless payment behavior over time
+- RQ3 analysis and modeling code for changes in cash versus cashless payment behavior over time
 
 The current RQ2 implementation compares JFK and LaGuardia across the four project periods using:
 
@@ -34,6 +34,7 @@ The current RQ3 implementation analyzes payment behavior across the four project
 - period-level payment mix summaries
 - percentage-point changes relative to the pre-COVID baseline
 - optional borough-level exploratory summaries using pickup borough
+- a held-out machine learning evaluation for trip-level cashless-versus-cash prediction
 
 The current repository also contains a `final_report/` workspace for the final paper draft, planning notes, and submission checklist files.
 
@@ -48,8 +49,9 @@ The current repository also contains a `final_report/` workspace for the final p
   - `airport_recovery_regression.py`: builds the RQ2 regression-ready airport panel and panel-regression outputs
   - `airport_trip_figures.py`: generates RQ2 descriptive figures and the regression comparison plot from the saved airport outputs
 - `RQ3/`
-  - `cashless_payment_analysis.py`: builds RQ3 payment-behavior summaries
-  - `cashless_payment_figures.py`: generates RQ3 figures from the payment summaries
+  - `cashless_payment_analysis.py`: builds RQ3 payment-behavior summaries and modeling outputs
+  - `cashless_payment_model.py`: trains and evaluates the held-out RQ3 classification models
+  - `cashless_payment_figures.py`: generates RQ3 figures from the payment summaries and saved model outputs
 - `final_report/`: final report LaTeX workspace, report guides, and RQ2 upgrade notes
 - `proposal/`: project proposal PDF, requirements PDF, and TA feedback
 - `midterm_report/`: midterm report materials, report repository, and TA feedback
@@ -69,7 +71,7 @@ The main entry point is [`query_taxi_duckdb.py`](query_taxi_duckdb.py), which:
 Install the required Python packages:
 
 ```bash
-pip install duckdb pandas numpy matplotlib seaborn
+pip install duckdb pandas numpy matplotlib seaborn scikit-learn xgboost
 ```
 
 This workflow expects the required parquet files to be present in `taxi_data/`.
@@ -225,21 +227,68 @@ python3 RQ2/airport_trip_figures.py
 
 ## RQ3 Workflow
 
-Run the RQ3 cashless-payment analysis from the repository root:
+RQ3 studies whether COVID accelerated the shift from cash to cashless payments and whether that shift persisted through the recovery period. The RQ3 workflow includes both descriptive summaries and a held-out machine learning evaluation for trip-level cashless-versus-cash prediction.
+
+Run the main RQ3 analysis from the repository root:
 
 ```bash
 python3 RQ3/cashless_payment_analysis.py
 ```
 
-This writes CSV outputs to `RQ3/outputs/`.
+This writes CSV outputs to `RQ3/outputs/`, including:
 
-To generate the figures used in the report:
+- descriptive monthly and period summaries:
+  - `cashless_monthly_summary.csv`
+  - `cashless_period_summary.csv`
+  - `cashless_change_summary.csv`
+  - `cashless_borough_period_summary.csv`
+- modeling outputs:
+  - `cashless_model_split_summary.csv`
+  - `cashless_model_metrics.csv`
+  - `cashless_model_top_features.csv`
+
+The RQ3 analysis groups payment behavior into:
+
+- `cashless` for credit card trips
+- `cash` for cash trips
+- `ambiguous/other` for all remaining payment codes
+
+The descriptive summaries report both:
+
+- cashless share among all trips
+- cashless share among known payment trips only
+
+The modeling component uses known-payment trips only and compares:
+
+- a dummy most-frequent baseline
+- logistic regression
+- XGBoost
+
+The default model workflow uses a time-based split, training on trips before July 2023 and testing on trips from July 2023 onward. The script also samples a fixed number of known-payment trips per month so that the full workflow remains practical to rerun locally.
+
+To generate the RQ3 figures used in the report:
 
 ```bash
 python3 RQ3/cashless_payment_figures.py
 ```
 
-This writes PNG figures to `RQ3/figures/`.
+This writes PNG figures to `RQ3/figures/`, including:
+
+- `monthly_cashless_share.png`
+- `period_payment_mix.png`
+- `cashless_share_change_vs_pre_covid.png`
+- `borough_cashless_share.png`
+- `cashless_model_metric_comparison.png`
+- `cashless_xgboost_feature_importance.png`
+
+### Recommended run order
+
+If you want the full RQ3 workflow, run the scripts in this order:
+
+```bash
+python3 RQ3/cashless_payment_analysis.py
+python3 RQ3/cashless_payment_figures.py
+```
 
 ## Project Goal
 

@@ -35,8 +35,6 @@ The current RQ3 implementation analyzes payment behavior across the four project
 - optional borough-level exploratory summaries using pickup borough
 - a held-out machine learning evaluation for trip-level cashless-versus-cash prediction
 
-The current repository also contains a `final_report/` workspace for the final paper draft, planning notes, and submission checklist files.
-
 ## Repository Contents
 
 - `query_taxi_duckdb.py`: reusable DuckDB query helper for local TLC parquet files
@@ -146,7 +144,7 @@ To generate the figures used in the report:
 python3 RQ1/tipping_figures.py
 ```
 
-This writes PNG figures to `RQ1/figures/`.
+After this workflow is run, the generated PNG figures are written to `RQ1/figures/`.
 
 ## RQ2 Workflow
 
@@ -196,7 +194,7 @@ For descriptive reporting, the repository saves both monthly-share and period-sh
 python3 RQ2/airport_trip_figures.py
 ```
 
-This writes the standard RQ2 figures to `RQ2/figures/`, including:
+After this workflow is run, the generated standard RQ2 figures are written to `RQ2/figures/`, including:
 
 - `monthly_airport_trip_counts.png`
 - `monthly_airport_trip_share.png`
@@ -205,7 +203,7 @@ This writes the standard RQ2 figures to `RQ2/figures/`, including:
 - `airport_average_total_amount.png`
 - `airport_regression_interactions.png`
 
-By default, this script reads the CSV outputs written by `airport_trip_analysis.py` instead of rebuilding the airport summaries from the raw parquet files. It uses the saved main and pickup-only regression coefficient files to generate the regression interaction plot alongside the descriptive figures. If the saved outputs are missing, it will run the analysis step first and then generate the figures.
+By default, this script reads the CSV outputs written by `airport_trip_analysis.py` instead of rebuilding the airport summaries from the raw parquet files. It uses the saved main and pickup-only regression coefficient files to generate the regression interaction plot alongside the descriptive figures. If the saved outputs are missing, it will run the analysis step first and then generate the figure files.
 
 The regression interaction plot compares the key JFK interaction coefficients across:
 
@@ -268,7 +266,7 @@ To generate the RQ3 figures used in the report:
 python3 RQ3/cashless_payment_figures.py
 ```
 
-This writes PNG figures to `RQ3/figures/`, including:
+After this workflow is run, the generated PNG figures are written to `RQ3/figures/`, including:
 
 - `monthly_cashless_share.png`
 - `period_payment_mix.png`

@@ -17,7 +17,6 @@ The repository currently contains:
 - a shared DuckDB-based query pipeline for summarizing TLC parquet files
 - RQ1 analysis code for changes in tipping behavior
 - RQ2 analysis code for airport-related yellow taxi recovery at JFK and LaGuardia
-- a midterm report workspace, including a nested Overleaf Git repository
 - RQ3 analysis and modeling code for changes in cash versus cashless payment behavior over time
 
 The current RQ2 implementation compares JFK and LaGuardia across the four project periods using:
@@ -52,9 +51,6 @@ The current repository also contains a `final_report/` workspace for the final p
   - `cashless_payment_analysis.py`: builds RQ3 payment-behavior summaries and modeling outputs
   - `cashless_payment_model.py`: trains and evaluates the held-out RQ3 classification models
   - `cashless_payment_figures.py`: generates RQ3 figures from the payment summaries and saved model outputs
-- `final_report/`: final report LaTeX workspace, report guides, and RQ2 upgrade notes
-- `proposal/`: project proposal PDF, requirements PDF, and TA feedback
-- `midterm_report/`: midterm report materials, report repository, and TA feedback
 
 ## Query Workflow
 
@@ -297,17 +293,3 @@ The project is a comparative analysis of NYC yellow taxi behavior before, during
 - changes in tipping behavior
 - airport-related trip recovery
 - changes in cash versus cashless payment behavior
-
-## Midterm Report and Overleaf Repo
-
-The midterm report lives under `midterm_report/`. The LaTeX report project is stored in:
-
-- `midterm_report/report_repo/`
-
-Important: `midterm_report/report_repo/` is its own nested Git repository used for the Overleaf project. That means:
-
-- changes inside `midterm_report/report_repo/` have their own Git status and history
-- running `git status` at the top level will not necessarily show file-level changes inside the nested report repo
-- if you want to inspect or commit report changes, run Git commands from inside `midterm_report/report_repo/`
-
-This split is intentional: the top-level repository tracks the analysis workspace, while the nested repo tracks the report source shared through Overleaf.
